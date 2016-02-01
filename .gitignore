@@ -1,0 +1,7 @@
+*.pyc
+*.pyo
+.*.swp
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
