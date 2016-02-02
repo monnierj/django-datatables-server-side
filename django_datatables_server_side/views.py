@@ -20,12 +20,15 @@ class DatatablesServerSideView(View):
     def __init__(self, *args, **kwargs):
         super(DatatablesServerSideView, self).__init__(*args, **kwargs)
         choice_fields_completion = {}
+        choice_fields_values = {}
 
         choice_fields = [field for field in self.model._meta.fields
                          if not isinstance(field, ForeignKey)]
 
         for field in choice_fields:
             search_choices = {}
+            render_choices = {}
+
             for cur_choice in field.choices:
                 try:
                     search_choices[cur_choice[1]] = cur_choice[0]
@@ -35,9 +38,21 @@ class DatatablesServerSideView(View):
                     search_choices[cur_choice[1].decode('utf-8')] = \
                         cur_choice[0]
 
+                try:
+                    render_choices[cur_choice[0]] = cur_choice[1]
+                except UnicodeDecodeError:
+                    render_choices[cur_choice[0]] = cur_choice[1].decode(
+                        'utf-8')
+                except IndexError:
+                    render_choices[cur_choice[0]] = cur_choice[0]
+
             if search_choices:
                 choice_fields_completion[field.name] = search_choices
 
+            if render_choices:
+                choice_fields_values[field.name] = render_choices
+
+        self.choice_fields_values = choice_fields_values
         self.choice_fields_completion = choice_fields_completion
         self.foreign_fields = self.foreign_fields
 
@@ -109,11 +124,15 @@ class DatatablesServerSideView(View):
         return self.model.objects.all()
 
     def render_column(self, row, column):
+        val = getattr(row, column)
+
         if column in self.foreign_fields:
-            fk_value = getattr(row, column)
+            fk_value = val
             return unicode(fk_value) if fk_value else None
+        elif column in self.choice_fields_completion:
+            return self.choice_fields_values[column][val]
         else:
-            return getattr(row, column)
+            return val
 
     def prepare_results(self, qs):
         json_data = []
@@ -131,7 +150,6 @@ class DatatablesServerSideView(View):
             page_id = paginator.num_pages
         elif page_id < 1:
             page_id = 1
-        print(page_id)
 
         objects = self.prepare_results(paginator.page(page_id))
         return {"draw": draw_idx,
