@@ -1,9 +1,10 @@
 # -*- coding: utf-8 -*-
 from __future__ import absolute_import, unicode_literals
 from django.core.paginator import Paginator
-from django.db.models import ForeignKey
+from django.db.models import ForeignKey, Q
 from django.http.response import HttpResponse, HttpResponseBadRequest
 from django.views.generic import View
+from django.utils import six
 from django_datatables_server_side.parameters import Column, Order
 import json
 
@@ -66,6 +67,10 @@ class DatatablesServerSideView(View):
 
         # Prepare the queryset and apply the search and order filters
         qs = self.get_initial_queryset()
+
+        if 'search_value' in params:
+            qs = self.filter_queryset(params['search_value'], qs)
+
         if len(params['orders']):
             qs = qs.order_by(
                 *[order.get_order_mode() for order in params['orders']])
@@ -117,6 +122,10 @@ class DatatablesServerSideView(View):
 
             order_index += 1
 
+        search_value = query_dict.get('search[value]')
+        if search_value:
+            params['search_value'] = search_value
+
         params.update({'columns': columns, 'orders': orders})
         return params
 
@@ -159,3 +168,25 @@ class DatatablesServerSideView(View):
 
     def customize_row(self, row, obj):
         pass
+
+    def choice_field_search(self, column, search_value):
+        values_dict = self.choice_fields_completion[column]
+        matching_choices = [val for key, val in six.iteritems(values_dict)
+                            if key.startswith(search_value)]
+        return Q(**{column + '__in': matching_choices})
+
+    def filter_queryset(self, search_value, qs):
+        search_filters = Q()
+        for col in self.searchable_columns:
+            if col in self.foreign_fields:
+                query_param_name = self.foreign_fields[col]
+            elif col in self.choice_fields_completion:
+                search_filters |= self.choice_field_search(
+                    col, search_value)
+                continue
+            else:
+                query_param_name = col
+            search_filters |=\
+                Q(**{query_param_name+'__istartswith': search_value})
+
+        return qs.filter(search_filters)
