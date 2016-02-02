@@ -13,7 +13,7 @@ DATATABLES_SERVERSIDE_MAX_COLUMNS = 30
 
 
 class DatatablesServerSideView(View):
-
+    columns = []
     searchable_columns = []
     foreign_fields = {}
     model = None
