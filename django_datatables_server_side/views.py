@@ -4,26 +4,11 @@ from django.core.paginator import Paginator
 from django.db.models import ForeignKey
 from django.http.response import HttpResponse, HttpResponseBadRequest
 from django.views.generic import View
+from django_datatables_server_side.parameters import Column, Order
 import json
 
 
 DATATABLES_SERVERSIDE_MAX_COLUMNS = 30
-
-
-class DatatablesServerSideColumn(object):
-
-    def __init__(self, name, searchable, orderable):
-        if name is None or searchable is None or\
-                orderable is None:
-            raise ValueError
-
-        self.name = name
-        self.searchable = True if searchable == "true" else False
-        self.orderable = True if orderable == "true" else False
-
-    def __repr__(self):
-        return '%s (searchable: %s, orderable: %s)' %\
-            (self.name, self.searchable, self.orderable)
 
 
 class DatatablesServerSideView(View):
@@ -64,7 +49,12 @@ class DatatablesServerSideView(View):
         except ValueError:
             return HttpResponseBadRequest()
 
+        # Prepare the queryset and apply the search and order filters
         qs = self.get_initial_queryset()
+        if len(params['orders']):
+            qs = qs.order_by(
+                *[order.get_order_mode() for order in params['orders']])
+
         paginator = Paginator(qs, params['length'])
 
         return HttpResponse(
@@ -87,15 +77,32 @@ class DatatablesServerSideView(View):
                 not has_finished:
             column_base = 'columns[%d]' % column_index
 
-            if query_dict.get(column_base + '[name]') is not None:
-                columns.append(DatatablesServerSideColumn(
-                    query_dict.get(column_base + '[name]'),
+            try:
+                columns.append(Column(
+                    query_dict[column_base + '[name]'],
                     query_dict.get(column_base + '[orderable]'),
                     query_dict.get(column_base + '[searchable]')))
+            except KeyError:
+                has_finished = True
 
-            column_index = column_index + 1
-        params['columns'] = columns
+            column_index += 1
 
+        orders = []
+        order_index = 0
+        has_finished = False
+        while order_index < len(self.columns) and not has_finished:
+            try:
+                order_base = 'order[%d]' % order_index
+                orders.append(Order(
+                    query_dict[order_base + '[column]'],
+                    query_dict[order_base + '[dir]'],
+                    columns))
+            except KeyError:
+                has_finished = True
+
+            order_index += 1
+
+        params.update({'columns': columns, 'orders': orders})
         return params
 
     def get_initial_queryset(self):
