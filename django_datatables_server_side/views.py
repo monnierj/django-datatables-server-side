@@ -5,7 +5,8 @@ from django.db.models import ForeignKey, Q
 from django.http.response import HttpResponse, HttpResponseBadRequest
 from django.views.generic import View
 from django.utils import six
-from django_datatables_server_side.parameters import Column, Order
+from django_datatables_server_side.parameters import (
+    Column, Order, ColumnOrderError)
 import json
 
 
@@ -98,10 +99,14 @@ class DatatablesServerSideView(View):
             column_base = 'columns[%d]' % column_index
 
             try:
-                columns.append(Column(
-                    query_dict[column_base + '[name]'],
-                    query_dict.get(column_base + '[orderable]'),
-                    query_dict.get(column_base + '[searchable]')))
+                column_name = query_dict[column_base + '[name]']
+                if column_name != '':
+                    columns.append(Column(
+                        column_name,
+                        query_dict.get(column_base + '[orderable]'),
+                        query_dict.get(column_base + '[searchable]')))
+                else:
+                    columns.append(Column('', placeholder=True))
             except KeyError:
                 has_finished = True
 
@@ -113,14 +118,17 @@ class DatatablesServerSideView(View):
         while order_index < len(self.columns) and not has_finished:
             try:
                 order_base = 'order[%d]' % order_index
+                order_column = query_dict[order_base + '[column]']
                 orders.append(Order(
-                    query_dict[order_base + '[column]'],
+                    order_column,
                     query_dict[order_base + '[dir]'],
                     columns))
+
+                order_index += 1
+            except ColumnOrderError:
+                pass
             except KeyError:
                 has_finished = True
-
-            order_index += 1
 
         search_value = query_dict.get('search[value]')
         if search_value:
