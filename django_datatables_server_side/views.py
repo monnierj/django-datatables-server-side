@@ -123,12 +123,12 @@ class DatatablesServerSideView(View):
                     order_column,
                     query_dict[order_base + '[dir]'],
                     columns))
-
-                order_index += 1
             except ColumnOrderError:
                 pass
             except KeyError:
                 has_finished = True
+            
+            order_index += 1
 
         search_value = query_dict.get('search[value]')
         if search_value:
