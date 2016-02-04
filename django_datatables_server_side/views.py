@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import absolute_import, unicode_literals
 from django.core.paginator import Paginator
+from django.core.serializers.json import DjangoJSONEncoder
 from django.db.models import ForeignKey, Q
 from django.http.response import HttpResponse, HttpResponseBadRequest
 from django.views.generic import View
@@ -77,11 +78,11 @@ class DatatablesServerSideView(View):
                 *[order.get_order_mode() for order in params['orders']])
 
         paginator = Paginator(qs, params['length'])
-
         return HttpResponse(
             json.dumps(
                 self.get_response_dict(paginator, params['draw'],
-                                       params['start'])
+                                       params['start']),
+                cls=DjangoJSONEncoder
             ),
             content_type="application/json")
 
@@ -127,7 +128,7 @@ class DatatablesServerSideView(View):
                 pass
             except KeyError:
                 has_finished = True
-            
+
             order_index += 1
 
         search_value = query_dict.get('search[value]')
