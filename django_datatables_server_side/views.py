@@ -2,12 +2,14 @@
 from __future__ import absolute_import, unicode_literals
 from django.core.paginator import Paginator
 from django.core.serializers.json import DjangoJSONEncoder
-from django.db.models import ForeignKey, Q
+from django.db.models import Q
 from django.http.response import HttpResponse, HttpResponseBadRequest
 from django.views.generic import View
 from django.utils import six
 from django_datatables_server_side.parameters import (
-    Column, Order, ColumnOrderError)
+    Column, ForeignColumn,
+    ColumnLink, PlaceholderColumnLink,
+    Order, ColumnOrderError)
 import json
 
 
@@ -22,41 +24,20 @@ class DatatablesServerSideView(View):
 
     def __init__(self, *args, **kwargs):
         super(DatatablesServerSideView, self).__init__(*args, **kwargs)
-        choice_fields_completion = {}
-        choice_fields_values = {}
+        fields = {f.name: f for f in self.model._meta.get_fields()}
 
-        choice_fields = [field for field in self.model._meta.fields
-                         if not isinstance(field, ForeignKey)]
+        model_columns = {}
+        for col_name in self.columns:
+            if col_name in self.foreign_fields:
+                new_column = ForeignColumn(
+                    col_name, self.model,
+                    self.foreign_fields[col_name])
+            else:
+                new_column = Column(fields[col_name])
 
-        for field in choice_fields:
-            search_choices = {}
-            render_choices = {}
+            model_columns[col_name] = new_column
 
-            for cur_choice in field.choices:
-                try:
-                    search_choices[cur_choice[1]] = cur_choice[0]
-                except IndexError:
-                    search_choices[cur_choice[0]] = cur_choice[0]
-                except UnicodeDecodeError:
-                    search_choices[cur_choice[1].decode('utf-8')] = \
-                        cur_choice[0]
-
-                try:
-                    render_choices[cur_choice[0]] = cur_choice[1]
-                except UnicodeDecodeError:
-                    render_choices[cur_choice[0]] = cur_choice[1].decode(
-                        'utf-8')
-                except IndexError:
-                    render_choices[cur_choice[0]] = cur_choice[0]
-
-            if search_choices:
-                choice_fields_completion[field.name] = search_choices
-
-            if render_choices:
-                choice_fields_values[field.name] = render_choices
-
-        self.choice_fields_values = choice_fields_values
-        self.choice_fields_completion = choice_fields_completion
+        self._model_columns = model_columns
         self.foreign_fields = self.foreign_fields
 
     def get(self, request, *args, **kwargs):
@@ -93,7 +74,7 @@ class DatatablesServerSideView(View):
 
         column_index = 0
         has_finished = False
-        columns = []
+        column_links = []
 
         while column_index < DATATABLES_SERVERSIDE_MAX_COLUMNS and\
                 not has_finished:
@@ -102,12 +83,13 @@ class DatatablesServerSideView(View):
             try:
                 column_name = query_dict[column_base + '[name]']
                 if column_name != '':
-                    columns.append(Column(
+                    column_links.append(ColumnLink(
                         column_name,
+                        self._model_columns[column_name],
                         query_dict.get(column_base + '[orderable]'),
                         query_dict.get(column_base + '[searchable]')))
                 else:
-                    columns.append(Column('', placeholder=True))
+                    column_links.append(PlaceholderColumnLink())
             except KeyError:
                 has_finished = True
 
@@ -123,7 +105,7 @@ class DatatablesServerSideView(View):
                 orders.append(Order(
                     order_column,
                     query_dict[order_base + '[dir]'],
-                    columns))
+                    column_links))
             except ColumnOrderError:
                 pass
             except KeyError:
@@ -135,22 +117,14 @@ class DatatablesServerSideView(View):
         if search_value:
             params['search_value'] = search_value
 
-        params.update({'columns': columns, 'orders': orders})
+        params.update({'column_links': column_links, 'orders': orders})
         return params
 
     def get_initial_queryset(self):
         return self.model.objects.all()
 
     def render_column(self, row, column):
-        val = getattr(row, column)
-
-        if column in self.foreign_fields:
-            fk_value = val
-            return unicode(fk_value) if fk_value else None
-        elif column in self.choice_fields_completion:
-            return self.choice_fields_values[column][val]
-        else:
-            return val
+        return self._model_columns[column].render_column(row)
 
     def prepare_results(self, qs):
         json_data = []
@@ -187,15 +161,16 @@ class DatatablesServerSideView(View):
     def filter_queryset(self, search_value, qs):
         search_filters = Q()
         for col in self.searchable_columns:
-            if col in self.foreign_fields:
-                query_param_name = self.foreign_fields[col]
-            elif col in self.choice_fields_completion:
-                search_filters |= self.choice_field_search(
-                    col, search_value)
-                continue
+            model_column = self._model_columns[col]
+
+            if model_column.has_choices_available:
+                search_filters |=\
+                    Q(**{col + '__in': model_column.search_in_choices(
+                        search_value)})
             else:
-                query_param_name = col
-            search_filters |=\
-                Q(**{query_param_name+'__istartswith': search_value})
+                query_param_name = model_column.get_field_search_path()
+
+                search_filters |=\
+                    Q(**{query_param_name+'__istartswith': search_value})
 
         return qs.filter(search_filters)

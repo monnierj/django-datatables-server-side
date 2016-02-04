@@ -6,7 +6,7 @@ All you have to do is to create a new view, configure which model has to be used
 
 Supported features are pagination, column ordering and global search (not restricted to a specific column). The searching function can find values in any string-convertible field, and also searched with choice descriptions of predefined choices fields.
 
-Foreign key fields can be used, provided that a primitive field is given in the view configuration.
+Foreign key fields can be used, provided that a QuerySet-like access path (i.e. model1__model2__field) is given in the configuration.
 
 ## How to use these views
 --------------
