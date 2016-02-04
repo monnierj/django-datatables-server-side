@@ -131,6 +131,9 @@ class ColumnLink(object):
         return '%s (searchable: %s, orderable: %s)' %\
             (self.name or '<placeholder>', self.searchable, self.orderable)
 
+    def get_field_search_path(self):
+        return self._model_column.get_field_search_path()
+
     def get_value(self, object_instance):
         return self._model_column.render_column(object_instance)
 
@@ -164,5 +167,5 @@ class Order(object):
 
     def get_order_mode(self):
         if not self.ascending:
-            return '-' + self.column_link.name
-        return self.column_link.name
+            return '-' + self.column_link.get_field_search_path()
+        return self.column_link.get_field_search_path()
