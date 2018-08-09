@@ -155,11 +155,11 @@ class Order(object):
             if self.column_link.placeholder:
                 raise ColumnOrderError(
                     'Requested to order a placeholder column (index %s)'
-                    + column_index)
+                    % column_index)
         except KeyError:
             raise ColumnOrderError(
                 'Requested to order a non-existing column (index %s)'
-                + column_index)
+                % column_index)
 
     def __repr__(self):
         return '%s: %s' % (

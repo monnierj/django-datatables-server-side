@@ -76,13 +76,14 @@ And this is a simple example of a template which will use our view (named "data-
 					ajax: {
 						url: "{% url "data-view" %}"
 					},
-					/* And set up the columns. Note that they must be identified by a "data" attribute,
-					   with the value matching the columns in your Django view. */
+					/* And set up the columns. Note that they must be identified by a "name" attribute,
+					   with the value matching the columns in your Django view. The "data" attribute selects which record value will be used,
+					   and should be the same value than for the "name" attribute. */
 					columns: [
-						{data: "name"},
-						{data: "age"},
-						{data: "department"},
-						{data: "manager"},
+						{name: "name", data: "name"},
+						{name: "age", data: "age"},
+						{name: "department", data: "department"},
+						{name: "manager", data: "manager"},
 					]
 				});
 			});
