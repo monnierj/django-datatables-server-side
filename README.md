@@ -1,5 +1,5 @@
 # Django Datatables Server-Side
---------------
+
 This package provides an easy way to process Datatables queries in the server-side mode.
 
 All you have to do is to create a new view, configure which model has to be used and which columns have to be displayed, and you're all set!
@@ -9,7 +9,7 @@ Supported features are pagination, column ordering and global search (not restri
 Foreign key fields can be used, provided that a QuerySet-like access path (i.e. model1__model2__field) is given in the configuration.
 
 ## How to use these views
---------------
+
 
 Just create a new view that inherits **DatatablesServerSideView**. Here is a short example of a view that gives access to a simplistic model named *Employees*:
 
@@ -38,6 +38,57 @@ class PeopleDatatableView(DatatablesServerSideView):
 	def customize_row(self, row, obj):
 		# 'row' is a dictionnary representing the current row, and 'obj' is the current object.
 		row['age_is_even'] = obj.age%2==0
+```
+
+And this is a simple example of a template which will use our view (named "data-view" in the router):
+
+```html
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="utf-8">
+		<link rel="stylesheet" href="//cdn.datatables.net/1.10.19/css/jquery.dataTables.min.css">
+	</head>
+	<body>
+		<h1>List of employees</h1>
+		<hr>
+		<table id="demo-table">
+			<thead>
+				<tr>
+					<th>Name</th>
+					<th>Age</th>
+					<th>Department</th>
+					<th>Manager</th>
+				</tr>
+			</thead>
+			<tbody></tbody>
+		</table>
+
+		<script src="//code.jquery.com/jquery-3.3.1.min.js"></script>
+		<script src="//cdn.datatables.net/1.10.19/js/jquery.dataTables.min.js"></script>
+		<script language="javascript">
+			$(document).ready(function () {
+				/* Here begins the DataTable configuration. */
+				$('#demo-table').DataTable({
+					/* Tell the DataTable that we need server-side processing. */
+					serverSide: true,
+					/* Set up the data source */
+					ajax: {
+						url: "{% url "data-view" %}"
+					},
+					/* And set up the columns. Note that they must be identified by a "data" attribute,
+					   with the value matching the columns in your Django view. */
+					columns: [
+						{data: "name"},
+						{data: "age"},
+						{data: "department"},
+						{data: "manager"},
+					]
+				});
+			});
+		</script>
+	</body>
+</html>
 ```
 
 The views will return HTTPResponseBadRequests if the request is not an AJAX request, or if parameters seems to be malformed.
