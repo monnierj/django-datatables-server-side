@@ -49,7 +49,7 @@ class DatatablesServerSideView(View):
             return HttpResponseBadRequest()
 
         # Prepare the queryset and apply the search and order filters
-        qs = self.get_initial_queryset()
+        qs = self.get_initial_queryset(request)
 
         if 'search_value' in params:
             qs = self.filter_queryset(params['search_value'], qs)
@@ -120,7 +120,7 @@ class DatatablesServerSideView(View):
         params.update({'column_links': column_links, 'orders': orders})
         return params
 
-    def get_initial_queryset(self):
+    def get_initial_queryset(self, request=None):
         return self.model.objects.all()
 
     def render_column(self, row, column):
