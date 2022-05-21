@@ -1,5 +1,8 @@
 # Django Datatables Server-Side
 
+> NOTE: this repository is archived. I haven't used this package for many years, it's not compatible with modern Django versions, and in a world of REST APIs, I'm not sure it's still meaningful.
+> However, if you want to use it, feel free to fork!
+
 This package provides an easy way to process Datatables queries in the server-side mode.
 
 All you have to do is to create a new view, configure which model has to be used and which columns have to be displayed, and you're all set!
